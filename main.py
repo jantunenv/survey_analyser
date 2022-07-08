@@ -4,6 +4,24 @@ import sys
 import matplotlib.pyplot as plt
 import kmedoids
 
+def solve_intersections(p1, p2, d13, d23):
+	#return intersections for circles at p1, p2
+	#with radius d13 and d23 respectedly
+	#Naming convention because this is for solving
+	#the position of p3 when distances to p1 and p2 are known
+	v12 = p2 - p1
+	d12 = np.linalg.norm(v12)
+
+	p3_1 = 0.5*( p1 + p2 ) + (( d13**2 - d23**2 ) / (2*d12**2)) * (p2 - p1) \
+			+ np.sqrt(2*((d13**2 + d23**2) / (d12**2) ) -  ( (d13**2 - d23**2) / (d12**4) ) - 1) \
+			* np.asarray( [p2[1] - p1[1], p2[0] - p1[0]])
+
+	p3_2 = 0.5*( p1 + p2 ) + (( d13**2 - d23**2 ) / (2*d12**2)) * (p2 - p1) \
+			- np.sqrt(2*((d13**2 + d23**2) / (d12**2) ) -  ( (d13**2 - d23**2) / (d12**4) ) - 1) \
+			* np.asarray( [p2[1] - p1[1], p2[0] - p1[0]])
+
+	return(p3_1, p3_2)
+
 def step_p(distance_matrix, points, indexes, index, step, beta=0.1):
 	loss = 0.0
 	for i in range(len(points)):
@@ -17,11 +35,10 @@ def step_p(distance_matrix, points, indexes, index, step, beta=0.1):
 		p = 1.0
 	else:
 		p = np.exp(-beta*(loss_new - loss))
-
 	return(p)
 
 
-def optimize_positions(distance_matrix, points, indexes, iterations = 1000000):
+def optimize_positions(distance_matrix, points, indexes, iterations = 100000):
 		max_step = 1.0
 		T_0 = 1.0
 		
@@ -75,19 +92,39 @@ def plot_distances(distance_matrix, groups, spacing = 1000.0):
 		points.append([])
 	
 	for i in range(len(groups.labels)):
+		if(i in medoids):
+			continue
 		g = groups.labels[i]
 		offset = pos[g]
-		angle = np.random.random()*2*np.pi
 		distance = distance_matrix[i, int(groups.medoids[g])]
-		points[g].append(offset + np.asarray([distance*np.cos(angle), distance*np.sin(angle)]))
 
+		#second best distance
+		second_best_d = np.inf
+		second_best_ind = 0
+		for j in range(k):
+			if(j == g):
+				continue
+			else:
+				d = distance_matrix[i, int(groups.medoids[j])]
+				if(d < second_best_d):
+					second_best_d = d
+					second_best_ind = j
+
+		r = np.random.random()
+		#if(r>0.5):
+		points[g].append(offset + solve_intersections(pos[g], pos[second_best_ind], distance, second_best_d)[0])
+		#else:
+		#	points[g].append(offset + solve_intersections(pos[g], pos[j], distance, d)[1])
+		
+	ax = plt.gca()
+	i = 0
 	for point_group in points:
+		color = next(ax._get_lines.prop_cycler)['color']
 		a = np.asarray(point_group)
-		plt.plot(a[:,0], a[:,1], '.')
-
-	pos = np.asarray(pos)
-
-	plt.plot(pos[:,0], pos[:,1], 'r*')
+		pos = np.asarray(pos)
+		plt.plot(a[:,0], a[:,1], '.', color = color)
+		plt.plot(pos[i,0], pos[i,1], '*', color = color)
+		i += 1
 	
 	plt.show()
 
@@ -163,11 +200,12 @@ def main():
 		else:
 			group_list[g_ind].append(excel.iat[i,title_key])
 
-
+	"""
 	for group in group_list:
 		for title in group:
 			print(title)
 		print("----------------")
+	"""
 
 	plot_distances(distance_matrix, groups, 50.0)
 	
